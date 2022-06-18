@@ -1,34 +1,51 @@
-#!/usr/bin/env python3
-""" lru cach module """
+#!/usr/bin/python3
+""" LRU Caching """
 
-
-from collections import deque
-BaseCaching = __import__('base_caching').BaseCaching
+from base_caching import BaseCaching
 
 
 class LRUCache(BaseCaching):
-    """ LRU """
+    """ LRU caching """
 
     def __init__(self):
-        """ constructor """
+        """ Constructor """
         super().__init__()
-        self.queue = deque()
+        self.queue = []
 
     def put(self, key, item):
-        """ put """
-        if key and item:
-            if key in self.cache_data:
-                self.queue.remove(key)
-            elif len(self.cache_data) >= self.MAX_ITEMS:
-                popped = self.queue.popleft()
-                del self.cache_data[popped]
-                print("DISCARD: " + str(popped))
+        """ Puts item in cache """
+        if key is None or item is None:
+            return
+
+        self.cache_data[key] = item
+
+        if len(self.cache_data) > BaseCaching.MAX_ITEMS:
+            first = self.get_first_list(self.queue)
+            if first:
+                self.queue.pop(0)
+                del self.cache_data[first]
+                print("DISCARD: {}".format(first))
+
+        if key not in self.queue:
             self.queue.append(key)
-            self.cache_data[key] = item
+        else:
+            self.mv_last_list(key)
 
     def get(self, key):
-        """ get """
-        if key in self.cache_data:
-            self.queue.remove(key)
-            self.queue.append(key)
-            return self.cache_data.get(key, None)
+        """ Gets item from cache """
+        item = self.cache_data.get(key, None)
+        if item is not None:
+            self.mv_last_list(key)
+        return item
+
+    def mv_last_list(self, item):
+        """ Moves element to last idx of list """
+        length = len(self.queue)
+        if self.queue[length - 1] != item:
+            self.queue.remove(item)
+            self.queue.append(item)
+
+    @staticmethod
+    def get_first_list(array):
+        """ Get first element of list or None """
+        return array[0] if array else None
