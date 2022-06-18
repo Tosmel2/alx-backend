@@ -1,73 +1,71 @@
 #!/usr/bin/python3
-""" 5. LFU Caching
-"""
+""" LFU Caching """
 
-from enum import Enum
-from heapq import heappush, heappop
-from itertools import count
-
-BaseCaching = __import__("base_caching").BaseCaching
-
-
-class HeapItemStatus(Enum):
-    """ HeapItemStatus
-    """
-    ACTIVE = 1
-    INACTIVE = 2
+from base_caching import BaseCaching
 
 
 class LFUCache(BaseCaching):
-    """ LFUCache """
+    """ LFU caching """
 
     def __init__(self):
-        """ Init
-        """
+        """ Constructor """
         super().__init__()
-        self.heap = []
-        self.map = {}
-        self.counter = count()
+        self.queue = []
+        self.counter = {}
 
     def put(self, key, item):
-        """ put """
-        if key and item:
-            if key in self.cache_data:
-                self.rehydrate(key)
-            else:
-                if self.is_full():
-                    self.evict()
-                self.add_to_heap(key)
-            self.cache_data[key] = item
+        """ Puts item in cache """
+        if key is None or item is None:
+            return
+
+        self.cache_data[key] = item
+
+        item_count = self.counter.get(key, None)
+
+        if item_count is not None:
+            self.counter[key] += 1
+        else:
+            self.counter[key] = 1
+
+        if len(self.cache_data) > BaseCaching.MAX_ITEMS:
+            first = self.get_first_list(self.queue)
+            if first:
+                self.queue.pop(0)
+                del self.cache_data[first]
+                del self.counter[first]
+                print("DISCARD: {}".format(first))
+
+        if key not in self.queue:
+            self.queue.insert(0, key)
+        self.mv_right_list(key)
 
     def get(self, key):
-        """ get """
-        if key in self.cache_data:
-            self.rehydrate(key)
-            return self.cache_data.get(key)
+        """ Gets item from cache """
+        item = self.cache_data.get(key, None)
+        if item is not None:
+            self.counter[key] += 1
+            self.mv_right_list(key)
+        return item
 
-    def is_full(self):
-        """ check number of items  """
-        return len(self.cache_data) >= self.MAX_ITEMS
+    def mv_right_list(self, item):
+        """ Moves element to the right, taking into account LFU """
+        length = len(self.queue)
 
-    def evict(self):
-        """ evict """
-        while self.heap:
-            _, __, item, status = heappop(self.heap)
-            if status == HeapItemStatus.ACTIVE:
-                print("DISCARD: " + str(item))
-                del self.cache_data[item]
-                return
+        idx = self.queue.index(item)
+        item_count = self.counter[item]
 
-    def rehydrate(self, key):
-        """ Marks current item as inactive and reinserts updated count back
-        into heap.
-        """
-        entry = self.map[key]
-        entry[-1] = HeapItemStatus.INACTIVE
-        self.add_to_heap(key, entry[0])
+        for i in range(idx, length):
+            if i != (length - 1):
+                nxt = self.queue[i + 1]
+                nxt_count = self.counter[nxt]
 
-    def add_to_heap(self, key, count=0):
-        """ Adds a new entry into heap.
-        """
-        entry = [1 + count, next(self.counter), key, HeapItemStatus.ACTIVE]
-        self.map[key] = entry
-        heappush(self.heap, entry)
+                if nxt_count > item_count:
+                    break
+
+        self.queue.insert(i + 1, item)
+        self.queue.remove(item)
+
+    @staticmethod
+    def get_first_list(array):
+        """ Get first element of list or None """
+        return array[0] if array else None
