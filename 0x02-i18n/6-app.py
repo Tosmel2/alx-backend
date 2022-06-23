@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
+'''
+    Use Babel to get user locale.
+'''
 
-"""
-use user locale
-"""
-
-from flask import Flask, render_template, request, g
 from flask_babel import Babel
+from flask import Flask, render_template, request, g
+from typing import Union
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 babel = Babel(app)
 
 
-class Config:
-    """
-    make configurations
-    """
-    LANGUAGES = ["en", "fr"]
-    BABEL_DEFAULT_LOCALE = "en"
-    BABEL_DEFAULT_TIMEZONE = "UTC"
+class Config(object):
+    '''
+        Babel configuration.
+    '''
+    LANGUAGES = ['en', 'fr']
+    BABEL_DEFAULT_LOCALE = 'en'
+    BABEL_DEFAULT_TIMEZONE = 'UTC'
 
 
 app.config.from_object(Config)
@@ -30,50 +30,54 @@ users = {
 }
 
 
-def get_user(login_as):
-    """
-    get user
-    """
+def get_user() -> Union[dict, None]:
+    '''
+        Get user from session as per variable.
+    '''
     try:
-        return users.get(int(login_as))
+        login_as = request.args.get('login_as', None)
+        user = users[int(login_as)]
     except Exception:
-        return
+        user = None
 
 
 @app.before_request
 def before_request():
-    """
-    before request
-    """
-    g.user = get_user(request.args.get("login_as"))
+    '''
+        Operations before request.
+    '''
+    user = get_user()
+    g.user = user
 
 
-@babel.localeselector
-def get_locale():
-    """
-    get locale.
-    """
-    locale = request.args.get("locale")
-    if locale:
-        return locale
-    user = request.args.get("login_as")
-    if user:
-        lang = users.get(int(user)).get('locale')
-        if lang in app.config['LANGUAGES']:
-            return lang
-    headers = request.headers.get("locale")
-    if headers:
-        return headers
-    return request.accept_languages.best_match(app.config['LANGUAGES'])
-
-
-@app.route('/', methods=["GET"], strict_slashes=False)
-def hello():
-    """
-    return string
-    """
+@app.route('/', methods=['GET'], strict_slashes=False)
+def helloWorld() -> str:
+    '''
+        Render template for Babel usage.
+    '''
     return render_template('6-index.html')
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port="5000")
+@babel.localeselector
+def get_locale() -> str:
+    '''
+        Get user locale to serve matching translation.
+    '''
+    locale = request.args.get('locale')
+    if locale in app.config['LANGUAGES']:
+        return locale
+
+    if g.user:
+        locale = g.user.get("locale")
+        if locale and locale in app.config['LANGUAGES']:
+            return locale
+
+    locale = request.headers.get('locale')
+    if locale and locale in app.config['LANGUAGES']:
+        return locale
+
+    return request.accept_languages.best_match(app.config['LANGUAGES'])
+
+
+if __name__ == '__main__':
+    app.run()
